@@ -3,16 +3,14 @@
 import datachain as dc
 
 LOCAL = True
-BUCKET = "data-flac-full/datachain-usw2-main-dev" if LOCAL else "s3://datachain-usw2-main-dev"
+BUCKET = "data-flac/datachain-usw2-main-dev" if LOCAL else "s3://datachain-usw2-main-dev"
 INPUT_DIR = f"balanced_train_segments/audio"
 INPUT_PATH = f"{BUCKET}/{INPUT_DIR}"
-#OUTPUT_PATH = f"{BUCKET}/test/{INPUT_DIR}"
-OUTPUT_PATH = f"{BUCKET}/test-mp3-from-cloud/{INPUT_DIR}"
+OUTPUT_PATH = f"{BUCKET}/test/{INPUT_DIR}"
 
 (
     dc
-    .read_storage("s3://datachain-usw2-main-dev/balanced_train_segments/audio", type="audio")
-    #.read_storage(INPUT_PATH, type="audio")
+    .read_storage(INPUT_PATH, type="audio")
     .filter(dc.C("file.path").glob("*.flac"))
     .map(res=lambda file: file.save(OUTPUT_PATH, format="mp3"))
     .exec()
