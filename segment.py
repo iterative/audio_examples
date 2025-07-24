@@ -1,3 +1,5 @@
+# Requirements: datachain[audio], librosa
+
 import io
 from collections.abc import Iterator
 from typing import Optional

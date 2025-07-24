@@ -1,3 +1,5 @@
+# Requirements: datachain[audio], pydub
+
 import tempfile
 
 from pydub import AudioSegment
