@@ -1,6 +1,7 @@
 # Requirements: datachain[audio], librosa, numpy
 
 import io
+import os
 from typing import Iterator, ClassVar
 
 import numpy as np
@@ -12,13 +13,15 @@ from datachain import AudioFile, Audio, func
 
 LOCAL = True
 STORAGE = "data-flac-full/datachain-usw2-main-dev/balanced_train_segments/audio/" \
-                if LOCAL else "s3://datachain-usw2-main-dev/sony_av_data"
+                if LOCAL else "s3://datachain-usw2-main-dev/balanced_train_segments"
+LIMIT = 2000
 OUTPUT = "waveforms"
 SAMPLE_RATE = None  # None to keep original sample rate
 
 
 class Waveform(BaseModel):
     file: AudioFile
+    filename: str  # Just the filename for easy lookup
     info: Audio
     channel: int
     channel_name: str
@@ -50,7 +53,7 @@ def get_channel_name(num_channels: int, channel_idx: int) -> str:
 def extract_waveforms(file: AudioFile) -> Iterator[Waveform]:
     """
     Extract waveforms from audio file, yielding one Waveform per channel.
-    File and audio metadata are duplicated for each channel to enable independent 
+    File and audio metadata are duplicated for each channel to enable independent
     processing.
     """
     data = io.BytesIO(file.read())
@@ -66,6 +69,7 @@ def extract_waveforms(file: AudioFile) -> Iterator[Waveform]:
         channel_data = audio[ch_idx].astype(Waveform.DTYPE)
         yield Waveform(
             file=file,
+            filename=os.path.basename(file.path),
             info=audio_info,
             channel=ch_idx,
             channel_name=get_channel_name(num_channels, ch_idx),
@@ -77,11 +81,18 @@ chain = (
     dc
     .read_storage(STORAGE, type="audio")
     .filter(dc.C("file.path").glob("*.wav") | dc.C("file.path").glob("*.flac"))
+)
+
+if LIMIT:
+    chain = chain.limit(LIMIT)
+
+chain = (
+    chain
     .gen(waveform=extract_waveforms)
     .save(OUTPUT)
 )
 
-chain.limit(100).to_parquet("waveform.pq")
+# chain.to_parquet("waveform.pq")
 
 if LOCAL:
     dc.read_dataset(OUTPUT).show()
