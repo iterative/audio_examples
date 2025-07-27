@@ -24,34 +24,34 @@ OUTPUT_DATASET = "waveform-files"
 SAMPLE_RATE = None  # None to keep original sample rate
 
 
-def relocate_path(
-    path,
-    base_dir,
-    output_dir,
+def rebase_path(
+    src_path,
+    old_base,
+    new_base,
     suffix: str = "",
     extension: str = "",
 ) -> str:
     """
-    Return a new file path in `output_dir`, preserving the relative path from `base_dir`.
+    Return a new file path in `new_base`, preserving the relative path from `old_base`.
     Optionally change the file extension and append a suffix to the filename.
     """
-    path = str(path)
-    base_dir = str(base_dir)
-    output_dir = str(output_dir)
+    src_path = str(src_path)
+    old_base = str(old_base)
+    new_base = str(new_base)
 
     # Preserve URI scheme like "s3://"
-    if "://" in output_dir:
-        scheme, out_rest = output_dir.split("://", 1)
+    if "://" in new_base:
+        scheme, out_rest = new_base.split("://", 1)
         output_prefix = f"{scheme}://"
         output_base = PurePosixPath(out_rest)
     else:
         output_prefix = ""
-        output_base = PurePosixPath(output_dir)
+        output_base = PurePosixPath(new_base)
 
-    if base_dir not in path:
-        raise ValueError(f"base_dir '{base_dir}' not found in path '{path}'")
+    if old_base not in src_path:
+        raise ValueError(f"old_base '{old_base}' not found in src_path '{src_path}'")
 
-    relative_str = path.split(base_dir, 1)[1].lstrip("/")
+    relative_str = src_path.split(old_base, 1)[1].lstrip("/")
     relative_path = PurePosixPath(relative_str)
 
     stem = relative_path.stem
@@ -121,8 +121,8 @@ def extract_waveforms(file: AudioFile) -> Iterator[Waveform]:
         buffer.seek(0)
 
         uri = file.get_uri()
-        output_filename = relocate_path(uri, INPUT_BASE_DIR, OUTPUT_BASE_DIR,
-                                        f"_ch{ch_idx}", "npy")
+        output_filename = rebase_path(uri, INPUT_BASE_DIR, OUTPUT_BASE_DIR,
+                                      f"_ch{ch_idx}", "npy")
 
         wave_file = File.upload(buffer.read(), output_filename)
         print(f"{file.source}, {file.path} --> {wave_file.source}, {wave_file.path}")
