@@ -12,12 +12,14 @@ from pydantic import BaseModel
 import datachain as dc
 from datachain import AudioFile, Audio, File
 
-LOCAL = False
-STORAGE = "data-flac-full/datachain-usw2-main-dev/balanced_train_segments/audio/" \
-                if LOCAL else "s3://datachain-usw2-main-dev/balanced_train_segments"
+LOCAL = True
+INPUT = "data-flac-full/datachain-usw2-main-dev/balanced_train_segments/" \
+                if LOCAL else "s3://datachain-usw2-main-dev/balanced_train_segments/"
 LIMIT = 10
-OUTPUT_BUCKET = "" if LOCAL else "s3://datachain-usw2-main-dev"
-OUTPUT_DIR = f"{STORAGE}/waveforms"
+INPUT_BASE_DIR = "balanced_train_segments"
+OUTPUT_BASE_DIR = "data-flac-full-waveform" if LOCAL \
+    else "s3://datachain-usw2-main-dev/balanced_train_segments-waveform/"
+
 OUTPUT_DATASET = "waveform-files"
 SAMPLE_RATE = None  # None to keep original sample rate
 
@@ -118,9 +120,8 @@ def extract_waveforms(file: AudioFile) -> Iterator[Waveform]:
         np.save(buffer, channel_data)
         buffer.seek(0)
 
-        output = f"{OUTPUT_BUCKET}//{OUTPUT_DIR}" if OUTPUT_BUCKET else OUTPUT_DIR
         uri = file.get_uri()
-        output_filename = relocate_path(uri, STORAGE, output,
+        output_filename = relocate_path(uri, INPUT_BASE_DIR, OUTPUT_BASE_DIR,
                                         f"_ch{ch_idx}", "npy")
 
         wave_file = File.upload(buffer.read(), output_filename)
@@ -138,7 +139,7 @@ def extract_waveforms(file: AudioFile) -> Iterator[Waveform]:
 
 chain = (
     dc
-    .read_storage(STORAGE, type="audio")
+    .read_storage(INPUT, type="audio")
     .filter(dc.C("file.path").glob("*.wav") | dc.C("file.path").glob("*.flac"))
 )
 
