@@ -1,4 +1,4 @@
-# Requirements: datachain[audio], librosa, numpy, soundfile
+# Requirements: datachain[audio], librosa, numpy
 
 import io
 import os
@@ -12,40 +12,45 @@ from pydantic import BaseModel
 import datachain as dc
 from datachain import AudioFile, Audio, File
 
-LOCAL = True
+LOCAL = False
 STORAGE = "data-flac-full/datachain-usw2-main-dev/balanced_train_segments/audio/" \
                 if LOCAL else "s3://datachain-usw2-main-dev/balanced_train_segments"
 LIMIT = 10
 OUTPUT_BUCKET = "" if LOCAL else "s3://datachain-usw2-main-dev"
 OUTPUT_DIR = f"{STORAGE}/waveforms"
+OUTPUT_DATASET = "waveform-files"
 SAMPLE_RATE = None  # None to keep original sample rate
 
 
 def relocate_path(
-        path,
-        base_dir,
-        output_dir,
-        suffix: str = "",
-        extension: str = "",
+    path,
+    base_dir,
+    output_dir,
+    suffix: str = "",
+    extension: str = "",
 ) -> str:
     """
     Return a new file path in `output_dir`, preserving the relative path from `base_dir`.
     Optionally change the file extension and append a suffix to the filename.
     """
-    file_path = PurePosixPath(path)
-    output_dir = PurePosixPath(output_dir)
+    path = str(path)
+    base_dir = str(base_dir)
+    output_dir = str(output_dir)
 
-    # Convert everything to strings for substring search
-    file_path_str = str(file_path)
-    base_dir_str = str(base_dir)
+    # Preserve URI scheme like "s3://"
+    if "://" in output_dir:
+        scheme, out_rest = output_dir.split("://", 1)
+        output_prefix = f"{scheme}://"
+        output_base = PurePosixPath(out_rest)
+    else:
+        output_prefix = ""
+        output_base = PurePosixPath(output_dir)
 
-    if base_dir_str not in file_path_str:
-        raise ValueError(
-            f"base_dir '{base_dir}' not found in file_path '{file_path}'")
+    if base_dir not in path:
+        raise ValueError(f"base_dir '{base_dir}' not found in path '{path}'")
 
-    # Keep everything after base_dir
-    after_base = file_path_str.split(base_dir_str, 1)[1].lstrip("/")
-    relative_path = PurePosixPath(after_base)
+    relative_str = path.split(base_dir, 1)[1].lstrip("/")
+    relative_path = PurePosixPath(relative_str)
 
     stem = relative_path.stem
     parent = relative_path.parent
@@ -54,11 +59,13 @@ def relocate_path(
         stem += suffix
 
     if extension:
-        new_filename = f"{stem}.{extension}"
+        filename = f"{stem}.{extension}"
     else:
-        new_filename = f"{stem}{relative_path.suffix}"
+        filename = f"{stem}{relative_path.suffix}"
 
-    return str(output_dir / parent / new_filename)
+    final_path = output_prefix + str(output_base / parent / filename)
+    return final_path
+
 
 class Waveform(BaseModel):
     file: AudioFile
@@ -93,8 +100,6 @@ def extract_waveforms(file: AudioFile) -> Iterator[Waveform]:
     File and audio metadata are duplicated for each channel to enable independent
     processing.
     """
-    import soundfile as sf
-    
     data = io.BytesIO(file.read())
     audio, sr = librosa.load(data, sr=SAMPLE_RATE, mono=False)
     audio_info = file.get_info()
@@ -108,24 +113,25 @@ def extract_waveforms(file: AudioFile) -> Iterator[Waveform]:
         channel_data = audio[ch_idx].astype(Waveform.DTYPE)
         channel_name = get_channel_name(num_channels, ch_idx)
         
-        # Create audio file in memory
+        # Save as numpy binary array
         buffer = io.BytesIO()
-        sf.write(buffer, channel_data, sr, format='WAV', subtype='PCM_16')
+        np.save(buffer, channel_data)
         buffer.seek(0)
 
-        output = f"{OUTPUT_BUCKET}/{OUTPUT_DIR}" if OUTPUT_BUCKET else OUTPUT_DIR
-        output_filename = relocate_path(file.get_uri(), STORAGE, output,
-                                        f"_ch{ch_idx}", "waveform")
+        output = f"{OUTPUT_BUCKET}//{OUTPUT_DIR}" if OUTPUT_BUCKET else OUTPUT_DIR
+        uri = file.get_uri()
+        output_filename = relocate_path(uri, STORAGE, output,
+                                        f"_ch{ch_idx}", "npy")
 
-        # print(f"output: {output_filename}")
         wave_file = File.upload(buffer.read(), output_filename)
+        print(f"{file.source}, {file.path} --> {wave_file.source}, {wave_file.path}")
 
         yield Waveform(
             file=file,
             filename=os.path.basename(file.path),
-            info=audio_info,
             channel=ch_idx,
             channel_name=channel_name,
+            info=audio_info,
             waveform_file=wave_file
         )
 
@@ -142,10 +148,8 @@ if LIMIT:
 chain = (
     chain
     .gen(waveform=extract_waveforms)
-    .save(OUTPUT_DIR)
+    .save(OUTPUT_DATASET)
 )
 
-# chain.to_parquet("waveform.pq")
-
 if LOCAL:
-    dc.read_dataset(OUTPUT_DIR).show()
+    dc.read_dataset(OUTPUT_DATASET).show()
