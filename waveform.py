@@ -14,7 +14,7 @@ from datachain import AudioFile, Audio, func
 LOCAL = True
 STORAGE = "data-flac-full/datachain-usw2-main-dev/balanced_train_segments/audio/" \
                 if LOCAL else "s3://datachain-usw2-main-dev/balanced_train_segments"
-LIMIT = 2000
+LIMIT = 300
 OUTPUT = "waveforms"
 SAMPLE_RATE = None  # None to keep original sample rate
 
