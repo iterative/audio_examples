@@ -17,9 +17,12 @@ OUTPUT = "spectrogram"
 
 
 def create_spectrogram(file: AudioFile):
-    audio_bytes = audio_to_bytes(file, format="mp3")
-    with io.BytesIO(audio_bytes) as f:
-        y, sr = librosa.load(f)
+    if lpath := file.get_local_path():
+        y, sr = librosa.load(lpath)
+    else:
+        audio_bytes = audio_to_bytes(file, format="mp3")
+        with io.BytesIO(audio_bytes) as f:
+            y, sr = librosa.load(f)
 
     # Compute the spectrogram using Short-Time Fourier Transform (STFT)
     spectrogram = np.abs(librosa.stft(y))
