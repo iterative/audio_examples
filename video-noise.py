@@ -55,7 +55,9 @@ chain = (
     .read_storage(bucket, type="video")
     .filter(dc.C("file.path").glob("*.mp4"))
     .limit(7)
-    .map(segm=lambda file: add_gaussian_noise_to_video(file, 0, 25))
+    .settings(parallel=4)
+    .map(segm=lambda file: add_gaussian_noise_to_video(file, 0, 25),
+         output=File)
     .save(output_dataset)
 )
 
