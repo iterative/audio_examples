@@ -48,7 +48,8 @@ def add_gaussian_noise_to_video(file: VideoFile, mean, stddev) -> VideoFile:
         cv2.destroyAllWindows()  # Destroy all OpenCV windows
 
         upload_to = file.rebase(bucket, output_path)
-        return File.upload(open(tmp.name, "rb").read(), upload_to)
+        tmp.seek(0)
+        return File.upload(tmp.read(), upload_to)
 
 chain = (
     dc
