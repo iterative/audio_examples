@@ -7,10 +7,11 @@ from datachain.model.ultralytics import YoloBBoxes, YoloSegments, YoloPoses
 from pydantic import BaseModel
 from ultralytics import YOLO
 
-local = True
-bucket = "data-video/" if local else "s3://datachain-usw2-main-dev/balanced_train_segments/video"
-output_path = f"{bucket}/temp/frames/"
-detection_dataset = "yolo-detector"
+local = False
+bucket = "data-video" if local else "s3://datachain-usw2-main-dev"
+input_path = f"{bucket}/balanced_train_segments/video"
+output_path = f"{bucket}/temp/video-detector-frames"
+detection_dataset = "yolo-frames-detector"
 
 
 class YoloDataModel(BaseModel):
@@ -35,7 +36,7 @@ def extract_frames(file: VideoFile) -> Iterator[VideoFrameImage]:
         yield VideoFrameImage(**image.model_dump(), num=num, video_ref=file)
 
 
-def process_yolo(yolo:YOLO, yolo_segm: YOLO, yolo_pose: YOLO, frame: ImageFile) -> YoloDataModel:
+def process_all(yolo: YOLO, yolo_segm: YOLO, yolo_pose: YOLO, frame: ImageFile) -> YoloDataModel:
     img = frame.read()
     return YoloDataModel(
         bbox=YoloBBoxes.from_results(yolo(img, verbose=False)),
@@ -43,22 +44,30 @@ def process_yolo(yolo:YOLO, yolo_segm: YOLO, yolo_pose: YOLO, frame: ImageFile) 
         poses=YoloPoses.from_results(yolo_pose(img, verbose=False))
     )
 
+
+def process_bbox(yolo: YOLO, frame: ImageFile) -> YoloBBoxes:
+    return YoloBBoxes.from_results(yolo(frame.read(), verbose=False))
+
+
 chain = (
     dc
-    .read_storage(bucket, type="video")
+    .read_storage(input_path, type="video")
     .filter(dc.C("file.path").glob("*.mp4"))
     .limit(2)
-    .settings(parallel=4)
+    .settings(parallel=5)
 
     .gen(frame=extract_frames)
 
-    # Apply yolo detector to frames
-  	.setup(
+    # Initialize models: once per processing thread
+    .setup(
         yolo=lambda: YOLO("yolo11n.pt"),
         yolo_segm=lambda: YOLO("yolo11n-seg.pt"),
         yolo_pose=lambda: YOLO("yolo11n-pose.pt")
     )
-    .map(yolo=process_yolo)
+
+    # Apply yolo detector to frames
+    # .map(bbox=process_bbox)
+    .map(yolo=process_all)
     .order_by("frame.path", "frame.num")
     .save(detection_dataset)
 )
