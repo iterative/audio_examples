@@ -6,7 +6,8 @@ import cv2
 from datachain import VideoFile, File
 
 local = False
-bucket = "data-video/" if local else "s3://datachain-usw2-main-dev/balanced_train_segments/video"
+bucket = "data-video/" if local else "s3://datachain-usw2-main-dev"
+input_path = f"{bucket}/balanced_train_segments/video"
 output_path = f"{bucket}/temp/noisy-video"
 output_dataset = "noisy-video"
 
@@ -14,14 +15,14 @@ output_dataset = "noisy-video"
 def new_dimensions(width, height, new_width=None, new_height=None, percent=None):
     """
     Calculates new dimensions for resizing based on various parameters.
-    
+
     Args:
         width (int): Original width of the frame/video.
         height (int): Original height of the frame/video.
         new_width (int, optional): The desired new width.
         new_height (int, optional): The desired new height.
         percent (float, optional): The percentage to scale (e.g., 50 for 50%).
-    
+
     Returns:
         tuple: (width, height) dimensions after resizing.
     """
@@ -93,16 +94,17 @@ def add_gaussian_noise_to_video_and_normalize(file: VideoFile, mean, stddev) -> 
         out.release()  # Release the VideoWriter object
         cv2.destroyAllWindows()  # Destroy all OpenCV windows
 
-        upload_to = file.rebase(bucket, output_path)
+        upload_to = file.rebase(input_path, output_path)
         tmp.seek(0)
         return File.upload(tmp.read(), upload_to)
 
+
 chain = (
     dc
-    .read_storage(bucket, type="video")
+    .read_storage(input_path, type="video")
     .filter(dc.C("file.path").glob("*.mp4"))
     .limit(7)
-    .settings(parallel=4)
+    .settings(parallel=5)
     .map(segm=lambda file: add_gaussian_noise_to_video_and_normalize(file, 0, 25),
          output=File)
     .save(output_dataset)
