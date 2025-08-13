@@ -1,3 +1,4 @@
 datachain[video,audio]
 opencv-python
 ultralytics
+librosa
