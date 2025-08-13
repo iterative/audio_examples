@@ -9,13 +9,15 @@ import librosa
 from pydantic import BaseModel
 
 import datachain as dc
-from datachain import AudioFile, Audio, func
+from datachain import AudioFile, Audio
 
-LOCAL = True
-STORAGE = "data-flac-full/datachain-usw2-main-dev/balanced_train_segments/audio/" \
+# Run locally (not in cluster) until binary batching limit issue is fixed.
+LOCAL = False
+STORAGE = "data-flac/datachain-usw2-main-dev/balanced_train_segments/audio/" \
                 if LOCAL else "s3://datachain-usw2-main-dev/balanced_train_segments"
-LIMIT = 300
 OUTPUT = "waveforms"
+OUTPUT_PQ = "s3://datachain-usw2-main-dev/test/waveforms-flac.pq"
+
 SAMPLE_RATE = None  # None to keep original sample rate
 
 
@@ -32,22 +34,6 @@ class Waveform(BaseModel):
     @property
     def waveform_np(self) -> np.ndarray:
         return np.frombuffer(self.waveform, dtype=self.DTYPE)
-
-
-def get_channel_name(num_channels: int, channel_idx: int) -> str:
-    """Map channel index to meaningful name based on common audio formats"""
-    if num_channels == 1:
-        return "Mono"
-    elif num_channels == 2:
-        return ["Left", "Right"][channel_idx]
-    elif num_channels == 4:
-        return ["W", "X", "Y", "Z"][channel_idx]  # First-order Ambisonics
-    elif num_channels == 6:
-        return ["FL", "FR", "FC", "LFE", "BL", "BR"][channel_idx]  # 5.1 surround
-    elif num_channels == 8:
-        return ["FL", "FR", "FC", "LFE", "BL", "BR", "SL", "SR"][channel_idx]  # 7.1 surround
-    else:
-        return f"Ch{channel_idx + 1}"
 
 
 def extract_waveforms(file: AudioFile) -> Iterator[Waveform]:
@@ -72,27 +58,18 @@ def extract_waveforms(file: AudioFile) -> Iterator[Waveform]:
             filename=os.path.basename(file.path),
             info=audio_info,
             channel=ch_idx,
-            channel_name=get_channel_name(num_channels, ch_idx),
+            channel_name=Audio.get_channel_name(num_channels, ch_idx),
             waveform=channel_data.tobytes()
         )
 
-
 chain = (
     dc
-    .read_storage(STORAGE, type="audio")
-    .filter(dc.C("file.path").glob("*.wav") | dc.C("file.path").glob("*.flac"))
-)
-
-if LIMIT:
-    chain = chain.limit(LIMIT)
-
-chain = (
-    chain
+    .read_storage(STORAGE, type="audio", update=True)
+    .filter(dc.C("file.path").glob("*.flac"))
+    # .limit(100)
+    .settings(batch_rows=300)
     .gen(waveform=extract_waveforms)
     .save(OUTPUT)
 )
 
-# chain.to_parquet("waveform.pq")
-
-if LOCAL:
-    dc.read_dataset(OUTPUT).show()
+chain.to_parquet(OUTPUT_PQ, chunk_size=500)
