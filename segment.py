@@ -1,4 +1,9 @@
-# Requirements: datachain[audio], librosa
+# /// script
+# dependencies = [
+#	"librosa",
+#   "datachain[video,audio]",
+# ]
+# ///
 
 import io
 from collections.abc import Iterator

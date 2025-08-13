@@ -1,4 +1,6 @@
-# Requirements: datachain[audio]
+# /// script
+# dependencies = ["datachain"]
+# ///
 
 import datachain as dc
 

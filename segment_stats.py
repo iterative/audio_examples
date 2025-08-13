@@ -1,4 +1,10 @@
-# Requirements: matplotlib
+# /// script
+# dependencies = [
+#   "numpy",
+#   "datachain[video,audio]",
+#   "matplotlib",
+# ]
+# ///
 
 import numpy as np
 import matplotlib.pyplot as plt

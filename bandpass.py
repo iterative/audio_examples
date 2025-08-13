@@ -1,3 +1,14 @@
+# /// script
+# dependencies = [
+#   "numpy",
+#   "scipy",
+#	"pydub",
+#   "datachain[video,audio]",
+#   "matplotlib",
+# ]
+# ///
+
+
 from io import BytesIO
 
 from pydub import AudioSegment

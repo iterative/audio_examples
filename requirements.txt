@@ -1,4 +1,8 @@
 datachain[video,audio]
 opencv-python
 ultralytics
+matplotlib
 librosa
+numpy
+scipy
+pydub

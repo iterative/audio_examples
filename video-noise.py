@@ -1,3 +1,10 @@
+# /// script
+# dependencies = [
+#   "datachain[video,audio]",
+#	"opencv-python",
+# ]
+# ///
+
 import tempfile
 
 import numpy as np

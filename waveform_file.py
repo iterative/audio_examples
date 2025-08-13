@@ -1,4 +1,10 @@
-# Requirements: datachain[audio], librosa, numpy
+# /// script
+# dependencies = [
+#   "numpy",
+#	"librosa",
+#   "datachain[video,audio]",
+# ]
+# ///
 
 import io
 import os

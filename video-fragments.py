@@ -1,7 +1,13 @@
+# /// script
+# dependencies = [
+#   "datachain[video,audio]",
+# ]
+# ///
+
 from typing import Iterator
 
 import datachain as dc
-from datachain import VideoFile, ImageFile, VideoFragment
+from datachain import VideoFile, VideoFragment
 
 local = False
 bucket = "data-video" if local else "s3://datachain-usw2-main-dev"

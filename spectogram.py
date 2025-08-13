@@ -1,3 +1,12 @@
+# /// script
+# dependencies = [
+#   "numpy",
+#	"librosa",
+#   "datachain[video,audio]",
+#   "matplotlib",
+# ]
+# ///
+
 import io
 
 import librosa

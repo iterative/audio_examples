@@ -1,3 +1,11 @@
+# /// script
+# dependencies = [
+#   "datachain[video,audio]",
+#	"opencv-python",
+#	"ultralytics",
+# ]
+# ///
+
 import os
 from typing import Iterator
 

@@ -1,5 +1,8 @@
-import datachain as dc
+# /// script
+# dependencies = ["datachain"]
+# ///
 
+import datachain as dc
 
 chain = (
     dc

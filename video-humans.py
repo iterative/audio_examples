@@ -1,3 +1,7 @@
+# /// script
+# dependencies = ["datachain"]
+# ///
+
 import datachain as dc
 from datachain.func.array import contains
 
