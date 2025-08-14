@@ -187,6 +187,9 @@ chain = (
 )
 ```
 
+![humanframes.png](assets/humanframes.png)
+
+
 ### Example: Videos Containing Humans
 
 ```python
@@ -210,6 +213,13 @@ chain = (
     .save(OUTPUT_DATASET)
 )
 ```
+
+Correct detection (with people):
+![humanvideos.png](assets/humanvideos.png)
+
+False detection (no people):
+![humanvideos.png](assets/humanvideos-no-people.png)
+
 
 ### Example: Summary Metrics - coverage by class
 
@@ -293,6 +303,11 @@ def custom_confidence_threshold(names, scores) -> bool:
 Results:
 - Default YOLO threshold: 2,741 frames with humans.
 - Custom, higher 0.936 threshold: 106 frames (more precise).
+
+Better detection (with people) using highest confidence score:
+
+![humanvideos-confidence.png](assets/humanvideos-confidence.png)
+
 
 ## Final Takeaway
 
