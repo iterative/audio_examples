@@ -1,1 +1,263 @@
-# audio_examples
+# Audio & Video Examples Tutorial
+
+## Data model: split videos by frames and extract bounding boxes & classes
+
+```shell
+uv pip install -r requirements.txt
+```
+
+```shell
+python video-detector.py
+```
+<details>
+<summary>video-detector.py script</summary>
+
+```python
+# /// script
+# dependencies = [
+#   "datachain[video,audio]",
+#	"opencv-python",
+#	"ultralytics",
+# ]
+# ///
+
+import os
+from typing import Iterator
+
+import datachain as dc
+from datachain import VideoFile, ImageFile
+from datachain.model.ultralytics import YoloBBoxes, YoloSegments, YoloPoses
+
+from pydantic import BaseModel
+from ultralytics import YOLO, settings
+
+local = False
+bucket = "data-video" if local else "s3://datachain-usw2-main-dev"
+input_path = f"{bucket}/balanced_train_segments/video"
+output_path = f"{bucket}/temp/video-detector-frames"
+detection_dataset = "frames-detector"
+target_fps = 1
+
+model_bbox = "yolo11n.pt"
+model_segm = "yolo11n-seg.pt"
+model_pose = "yolo11n-pose.pt"
+
+
+# Upload models to avoid YOLO-downloader issues
+if not local:
+    weights_dir = f"{os.getcwd()}/{settings['weights_dir']}"
+    dc.read_storage([
+        f"{bucket}/models/{model_bbox}",
+        f"{bucket}/models/{model_segm}",
+        f"{bucket}/models/{model_pose}",
+    ]
+    ).to_storage(weights_dir, placement="filename")
+
+    model_bbox = f"{weights_dir}/{model_bbox}"
+    model_segm = f"{weights_dir}/{model_segm}"
+    model_pose = f"{weights_dir}/{model_pose}"
+
+
+class YoloDataModel(BaseModel):
+    bbox: YoloBBoxes
+    segm: YoloSegments
+    poses: YoloPoses
+
+
+class VideoFrameImage(ImageFile):
+    num: int
+    orig: VideoFile
+
+
+def extract_frames(file: VideoFile) -> Iterator[VideoFrameImage]:
+    info = file.get_info()
+
+    # one frame per sec
+    step = int(info.fps / target_fps) if target_fps else 1
+    frames = file.get_frames(step=step)
+
+    for num, frame in enumerate(frames):
+        image = frame.save(output_path, format="jpg")
+        yield VideoFrameImage(**image.model_dump(), num=num, orig=file)
+
+
+def process_all(yolo: YOLO, yolo_segm: YOLO, yolo_pose: YOLO, frame: ImageFile) -> YoloDataModel:
+    img = frame.read()
+    return YoloDataModel(
+        bbox=YoloBBoxes.from_results(yolo(img, verbose=False)),
+        segm=YoloSegments.from_results(yolo_segm(img, verbose=False)),
+        poses=YoloPoses.from_results(yolo_pose(img, verbose=False))
+    )
+
+
+def process_bbox(yolo: YOLO, frame: ImageFile) -> YoloBBoxes:
+    return YoloBBoxes.from_results(yolo(frame.read(), verbose=False))
+
+
+chain = (
+    dc
+    .read_storage(input_path, type="video")
+    .filter(dc.C("file.path").glob("*.mp4"))
+    .sample(2)
+    .settings(parallel=5)
+
+    .gen(frame=extract_frames)
+
+    # Initialize models: once per processing thread
+    .setup(
+        yolo=lambda: YOLO(model_bbox),
+        # yolo_segm=lambda: YOLO(model_segm),
+        # yolo_pose=lambda: YOLO(model_pose)
+    )
+
+    # Apply yolo detector to frames
+    .map(bbox=process_bbox)
+    # .map(yolo=process_all)
+    .order_by("frame.path", "frame.num")
+    .save(detection_dataset)
+)
+
+if local:
+    chain.show()
+```
+</details>
+
+Data model UI:
+
+![datamodel.png](assets/datamodel.png)
+
+## Analyse videos - vectorized operations
+
+Vectorised operations are built-in and can analyse 100s of millions of records in seconds.
+
+### Find frames with humans
+
+```python
+import datachain as dc
+from datachain.func import array
+
+INPUT_DATASET = "frames-detector"
+HUMAN_DATASET = "human-frames"
+
+TARGET_CLASS = "person"
+
+chain = (
+    dc.read_dataset(INPUT_DATSET)
+    .mutate(is_human=array.contains(dc.C("bbox.name"), TARGET_CLASS))
+    .filter(dc.column("is_human"))
+    .save(HUMAN_DATASET)
+)
+```
+
+### Video files with humans
+
+```python
+import datachain as dc
+from datachain.func import array
+
+INPUT_DATSET = "human-frames"
+OUTPUT_DATASET = "human-videos"
+
+chain = (
+    # Reuse the previous frame dataset with human frames
+    dc.read_dataset(INPUT_DATSET)
+
+    # Make video column unique while ignoring frame columns
+    .distinct("frame.orig")
+
+    # To make it look clean - rename video column to video & remove the rest
+    .mutate(video=dc.Column("frame.orig"))
+    .select("video")
+
+    .save(OUTPUT_DATASET)
+)
+```
+
+### Summary metrics
+
+You can build a summary stats metrics using built-in vectorized operations
+like `count()`, `sum()`, `mean()`, `std()` and many others.
+
+```python
+import datachain as dc
+from datachain.func.array import contains
+
+input_dataset = "global.video.frames-detector"
+stats_dataset = "global.video.frames-detector-stats"
+
+chain = dc.read_dataset(input_dataset)
+
+total_frames = chain.count()
+total_videos = chain.distinct("frame.orig").count()
+
+dc.read_values(
+    class_name = ["person", "car", "truck"],
+    frame_coverage = [
+        chain.filter(contains("bbox.name", "person")).count()*1.0/total_frames,
+        chain.filter(contains("bbox.name", "car")).count()*1.0/total_frames,
+        chain.filter(contains("bbox.name", "truck")).count()*1.0/total_frames,
+    ],
+    video_coverage = [
+        chain.filter(contains("bbox.name", "person")).distinct("frame.orig").count()*1.0/total_videos,
+        chain.filter(contains("bbox.name", "car")).distinct("frame.orig").count()*1.0/total_videos,
+        chain.filter(contains("bbox.name", "truck")).distinct("frame.orig").count()*1.0/total_videos,
+    ],
+).save(stats_dataset)
+```
+
+Result:
+
+| class_name | frame_coverage        | video_coverage |
+|------------|-----------------------|----------------|
+| car        | 0.04155739358482954    | 0.11           |
+| person     | 0.5529554165826105     | 0.718          |
+| truck      | 0.017954407908008875   | 0.058          |
+
+
+## Analyse videos - custom Python code
+
+In many cases, user needs more flexibility and needs to run their custom code, ML models or LLM calls that are not built-in and vectorized.
+One of these examples you might noticed above when YOLO model was used to produce bounding boxes.
+
+In DataChain custom code is all possible forms:
+1. `map()` - mappers. One-to-one: introduces new columns without changing number of rows.
+2. `gen()` - generators. One-to-many: one row produces multiple rows (like one video generates multiple frames).
+3. `agg()` - aggregators. Many-to-one: new columns but rows are grouped to a smaller amount of rows by a specified.
+
+### Frames with humans for a given threshold
+
+In previos example, we selected a subset of frames with humans. What if we need a higher confidence that human are presented in a frame?
+We can analyse not only class name from YOLO, but also confedence score.
+
+Let's select humans from the dataset but for a custom, higher confedence score.
+In this case, we need to create a custom Python function to filter this out.
+
+Note, the function inputs are provided in `params` of the `map()`.
+Output column is specified in keyword argument assignment `is_human=` in the function call.
+
+```python
+import datachain as dc
+
+input_dataset = "frames-detector"
+confident_human_dataset = "confident_human"
+
+target_class = "person"
+target_threshold = 0.936
+
+def custom_confidence_threshold(names, scores) -> bool:
+    for name, score in zip(names, scores):
+        if name == target_class and score >= target_threshold:
+            return True
+    return False
+
+(
+    dc.read_dataset(input_dataset)
+    .settings(parallel=True)
+    .map(is_human=custom_confidence_threshold, params=["bbox.name", "bbox.confidence"])
+    .filter(dc.C("is_human"))
+    .save(confident_human_dataset)
+)
+```
+
+For the higher confidence threshold we got only 106 frames which is significantly 
+lower and more precises comparing to 2,741 frames for the default YOLO threshold.
