@@ -140,7 +140,8 @@ if local:
 
 Data model Studio UI:
 
-![datamodel.png](assets/datamodel.png)
+<img src="assets/datamodel.png" alt="Data model" width="50%">
+
 
 Data model in command line:
 ```shell
@@ -187,7 +188,7 @@ chain = (
 )
 ```
 
-![humanframes.png](assets/humanframes.png)
+<img src="assets/humanframes.png" alt="Frames with humans" width="50%">
 
 
 ### Example: Videos Containing Humans
@@ -214,11 +215,11 @@ chain = (
 )
 ```
 
-Correct detection (with people):
-![humanvideos.png](assets/humanvideos.png)
+**Correct detection (with people)**:
+<img src="assets/humanvideos.png" alt="Correct detection - with people" width="50%">
 
-False detection (no people):
-![humanvideos.png](assets/humanvideos-no-people.png)
+**False detection (no people)**:
+<img src="assets/humanvideos-no-people.png" alt="False detection no people" width="50%">
 
 
 ### Example: Summary Metrics - coverage by class
@@ -306,7 +307,7 @@ Results:
 
 Better detection (with people) using highest confidence score:
 
-![humanvideos-confidence.png](assets/humanvideos-confidence.png)
+<img src="assets/humanvideos-confidence.png" alt="High confidence score" width="50%">
 
 
 ## Final Takeaway
