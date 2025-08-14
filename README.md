@@ -1,11 +1,27 @@
 # Audio & Video Examples Tutorial
 
-## Data model: split videos by frames and extract bounding boxes & classes
+This tutorial shows how to process and analyze audio/video data at scale with DataChain.
 
+Unlike big data (lots of rows in tables), **heavy data** is large, complex, unstructured
+files - videos, audio, images - rich in information but harder to query directly.
+
+DataChain turns heavy data into structured, queryable form for fast analysis and
+integration with AI/ML pipelines, dashboards, and LLM reasoning.
+
+
+📊 Why this matters:
+- Turn unstructured heavy data into structured, analyzable form.
+- Generate new features and signals for deeper insight.
+- Process millions of files at high speed using parallel and distributed compute.
+
+## 1. Extract Frames from Video & Detect Objects
+
+Install dependencies:
 ```shell
 uv pip install -r requirements.txt
 ```
 
+Run the Frame Extractor:
 ```shell
 python video-detector.py
 ```
@@ -122,15 +138,37 @@ if local:
 ```
 </details>
 
-Data model UI:
+Data model Studio UI:
 
 ![datamodel.png](assets/datamodel.png)
 
-## Analyse videos - vectorized operations
+Data model in command line:
+```shell
+                               frame  frame frame                        frame   frame      bbox               bbox                bbox
+                                path   size   num                         orig    orig       cls               name          confidence
+                                                                          path    size
+0   --cB2ZVjpnA_30000_40000_0000.jpg  48408     0  --cB2ZVjpnA_30000_40000.mp4  988747       [0]           [person]           [0.59072]
+1   --cB2ZVjpnA_30000_40000_0030.jpg  37469     1  --cB2ZVjpnA_30000_40000.mp4  988747      [59]              [bed]           [0.74741]
+2   --cB2ZVjpnA_30000_40000_0060.jpg  40120     2  --cB2ZVjpnA_30000_40000.mp4  988747       [0]           [person]           [0.82895]
+3   --cB2ZVjpnA_30000_40000_0090.jpg  38252     3  --cB2ZVjpnA_30000_40000.mp4  988747        []                 []                  []
+4   --cB2ZVjpnA_30000_40000_0120.jpg  38510     4  --cB2ZVjpnA_30000_40000.mp4  988747        []                 []                  []
+5   --cB2ZVjpnA_30000_40000_0150.jpg  39389     5  --cB2ZVjpnA_30000_40000.mp4  988747       [0]           [person]           [0.53502]
+6   --cB2ZVjpnA_30000_40000_0180.jpg  37848     6  --cB2ZVjpnA_30000_40000.mp4  988747        []                 []                  []
+7   --cB2ZVjpnA_30000_40000_0210.jpg  39139     7  --cB2ZVjpnA_30000_40000.mp4  988747       [0]           [person]           [0.79843]
+8   --cB2ZVjpnA_30000_40000_0240.jpg  38311     8  --cB2ZVjpnA_30000_40000.mp4  988747        []                 []                  []
+9   --cB2ZVjpnA_30000_40000_0270.jpg  40387     9  --cB2ZVjpnA_30000_40000.mp4  988747        []                 []                  []
+10  -0FHUc78Gqo_30000_40000_0000.jpg  15189     0  -0FHUc78Gqo_30000_40000.mp4  761357        []                 []                  []
+```
 
-Vectorised operations are built-in and can analyse 100s of millions of records in seconds.
+## Vectorized Video Analysis
 
-### Find frames with humans
+Once heavy data is transformed into structured signals, you can apply vectorized
+operations to analyze hundreds of millions of records in seconds.
+
+This stage is where new insights emerge — from finding patterns in object detections to
+summarizing datasets for decision-making.
+
+### Example: Find Frames with Humans
 
 ```python
 import datachain as dc
@@ -149,7 +187,7 @@ chain = (
 )
 ```
 
-### Video files with humans
+### Example: Videos Containing Humans
 
 ```python
 import datachain as dc
@@ -173,7 +211,7 @@ chain = (
 )
 ```
 
-### Summary metrics
+### Example: Summary Metrics - coverage by class
 
 You can build a summary stats metrics using built-in vectorized operations
 like `count()`, `sum()`, `mean()`, `std()` and many others.
@@ -205,7 +243,7 @@ dc.read_values(
 ).save(stats_dataset)
 ```
 
-Result:
+Sample Output:
 
 | class_name | frame_coverage        | video_coverage |
 |------------|-----------------------|----------------|
@@ -214,26 +252,19 @@ Result:
 | truck      | 0.017954407908008875   | 0.058          |
 
 
-## Analyse videos - custom Python code
+## Custom Python Analysis
 
-In many cases, user needs more flexibility and needs to run their custom code, ML models or LLM calls that are not built-in and vectorized.
-One of these examples you might noticed above when YOLO model was used to produce bounding boxes.
+When built-in analytics aren't enough, inject custom code or models to add
+domain-specific logic and create richer signals from already-processed heavy data.
 
-In DataChain custom code is all possible forms:
-1. `map()` - mappers. One-to-one: introduces new columns without changing number of rows.
-2. `gen()` - generators. One-to-many: one row produces multiple rows (like one video generates multiple frames).
-3. `agg()` - aggregators. Many-to-one: new columns but rows are grouped to a smaller amount of rows by a specified.
+### Example: Higher Confidence Human Detection
 
-### Frames with humans for a given threshold
+In the previous example, we found frames with humans.
+Now, let's filter for higher confidence by checking both the class name and YOLO's
+confidence score.
 
-In previos example, we selected a subset of frames with humans. What if we need a higher confidence that human are presented in a frame?
-We can analyse not only class name from YOLO, but also confedence score.
-
-Let's select humans from the dataset but for a custom, higher confedence score.
-In this case, we need to create a custom Python function to filter this out.
-
-Note, the function inputs are provided in `params` of the `map()`.
-Output column is specified in keyword argument assignment `is_human=` in the function call.
+We'll create a small Python function to do this, passing the required columns via params
+and writing the result to the is_human column.
 
 ```python
 import datachain as dc
@@ -259,5 +290,13 @@ def custom_confidence_threshold(names, scores) -> bool:
 )
 ```
 
-For the higher confidence threshold we got only 106 frames which is significantly 
-lower and more precises comparing to 2,741 frames for the default YOLO threshold.
+Results:
+- Default YOLO threshold: 2,741 frames with humans.
+- Custom, higher 0.936 threshold: 106 frames (more precise).
+
+## Final Takeaway
+
+This pipeline turns raw, unstructured heavy data into structured datasets that can:
+- Power custom ML models.
+- Feed dashboards and search systems.
+- Enable fast, scalable analytics that cut through data size barriers.
