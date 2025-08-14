@@ -140,7 +140,7 @@ if local:
 
 Data model Studio UI:
 
-<img src="assets/datamodel.png" alt="Data model" width="75%">
+<img src="assets/datamodel.png" alt="Data model" width="75%" style="border: 2px solid black;">
 
 
 Data model in command line:
@@ -188,7 +188,7 @@ chain = (
 )
 ```
 
-<img src="assets/humanframes.png" alt="Frames with humans" width="75%">
+<img src="assets/humanframes.png" alt="Frames with humans" width="75%" style="border: 2px solid black;">
 
 
 ### Example: Videos Containing Humans
@@ -306,7 +306,7 @@ Results:
 
 Better detection (with people) using highest confidence score:
 
-<img src="assets/humanvideos-confidence.png" alt="High confidence score" width="75%">
+<img src="assets/humanvideos-confidence.png" alt="High confidence score" width="75%" style="border: 2px solid black;">
 
 
 ## Final Takeaway
