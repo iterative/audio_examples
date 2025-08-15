@@ -111,7 +111,7 @@ def add_gaussian_noise_to_video_and_normalize(file: VideoFile, mean, stddev) -> 
         out.release()  # Release the VideoWriter object
         cv2.destroyAllWindows()  # Destroy all OpenCV windows
 
-        upload_to = file.rebase(input_path, output_path, extention=suffix[1:])
+        upload_to = file.rebase(input_path, output_path, extension=suffix[1:])
 
         tmp.seek(0)
         return File.upload(tmp.read(), upload_to)
