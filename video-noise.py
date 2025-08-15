@@ -2,6 +2,7 @@
 # dependencies = [
 #   "datachain[video,audio]",
 #	"opencv-python",
+#	"numpy",
 # ]
 # ///
 
@@ -79,10 +80,18 @@ def add_gaussian_noise_to_video_and_normalize(file: VideoFile, mean, stddev) -> 
     output_dim = new_dimensions(frame_width, frame_height, percent=50)
 
     # Define the codec and create a VideoWriter object with the calculated dimensions
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Codec for MP4 files
 
-    with tempfile.NamedTemporaryFile(suffix=".mp4") as tmp:
+    # encoder = "mp4v"
+    # suffix = ".mp4"
+    encoder = "VP90"
+    suffix = ".webm"
+
+    fourcc = cv2.VideoWriter_fourcc(*encoder)  # Codec for MP4 files
+
+    with tempfile.NamedTemporaryFile(suffix=suffix) as tmp:
         out = cv2.VideoWriter(tmp.name, fourcc, fps, output_dim)
+        assert out.isOpened(), f"'{encoder}' encoder not available"
+
         while True:
             ret, frame = cap.read()  # Read each frame
 
@@ -95,13 +104,15 @@ def add_gaussian_noise_to_video_and_normalize(file: VideoFile, mean, stddev) -> 
             # Add noise to the current frame based on the specified noise_type
             gauss_noise = np.random.normal(mean, stddev, frame.shape).astype(np.uint8)
             noisy_frame = cv2.add(frame, gauss_noise)
-            noisy_frame = cv2.normalize(noisy_frame, None, 0, 1.0, cv2.NORM_MINMAX)
+            noisy_frame = cv2.normalize(noisy_frame, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+
             out.write(noisy_frame)  # Write the noisy frame to the output video
         cap.release()  # Release the VideoCapture object
         out.release()  # Release the VideoWriter object
         cv2.destroyAllWindows()  # Destroy all OpenCV windows
 
-        upload_to = file.rebase(input_path, output_path)
+        upload_to = file.rebase(input_path, output_path, extention=suffix[1:])
+
         tmp.seek(0)
         return File.upload(tmp.read(), upload_to)
 
@@ -117,4 +128,5 @@ chain = (
     .save(output_dataset)
 )
 
-chain.show()
+if local:
+    chain.show()
