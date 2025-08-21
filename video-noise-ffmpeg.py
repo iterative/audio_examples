@@ -89,7 +89,9 @@ def add_gaussian_noise_to_video_and_normalize(file: VideoFile, mean, stddev) -> 
         cmd = [
             'ffmpeg', '-y', '-f', 'rawvideo', '-pix_fmt', 'bgr24',
             '-s', f'{w}x{h}', '-r', str(fps), '-i', '-',
-            '-c:v', 'libx264', '-pix_fmt', 'yuv420p', tmp.name
+            '-c:v', 'libx264', '-pix_fmt', 'yuv420p',
+            "-loglevel", "error",
+            tmp.name
         ]
         proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
 
