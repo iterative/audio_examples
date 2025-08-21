@@ -14,7 +14,7 @@ import librosa
 from pydantic import BaseModel
 
 import datachain as dc
-from datachain import AudioFile, AudioFragment
+from datachain import AudioFile, AudioFragment, Audio
 
 LOCAL = False
 STORAGE = "data15/" if LOCAL else "s3://datachain-usw2-main-dev/sony_av_data"
@@ -112,7 +112,7 @@ def segment_audio(file: AudioFile) -> Iterator[Segment]:
             yield Segment(
                 fragment=AudioFragment(audio=file, start=start_time, end=end_time),
                 id=segment_index,
-                channel=get_channel_name(channel_type, ch_idx),
+                channel=Audio.get_channel_name(channel_type, ch_idx),
                 rms=ch_rms,
                 rms_mean=mean_rms,
                 rms_std=std_rms,
@@ -132,10 +132,11 @@ chain = (
     dc
     .read_storage(STORAGE, type="audio")
     .filter(dc.C("file.path").glob("*.wav"))
+    .settings(parallel=True)
     .gen(segm=segment_audio)
     .order_by("segm.fragment.audio.path", "segm.id")
     .save(OUTPUT)
 )
 
 if LOCAL:
-    dc.read_dataset(OUTPUT).show()
+    chain.show()
