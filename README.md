@@ -138,10 +138,9 @@ if local:
 ```
 </details>
 
-Data model Studio UI:
+## Data model Studio UI
 
-<img src="assets/datamodel.png" alt="Data model" width="75%" style="border: 2px solid black;">
-
+![Data Model UI](assets/datamodel.gif)
 
 Data model in command line:
 ```shell
